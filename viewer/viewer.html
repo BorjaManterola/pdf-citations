@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF viewer</title>
+<style>
+  body { margin: 0; background: #525659; font: 13px system-ui, sans-serif; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 5; display: flex;
+    gap: 6px; align-items: center; padding: 0 10px; background: #323639; color: #eee; }
+  #bar button { background: #4a4d50; color: #eee; border: 0; border-radius: 4px; padding: 4px 9px;
+    font-size: 14px; cursor: pointer; }
+  #bar button:hover { background: #5f6368; }
+  #bar input { width: 40px; text-align: center; background: #202124; color: #eee; border: 0;
+    border-radius: 4px; padding: 4px; }
+  #note { color: #fdd663; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #pages { padding: 52px 0 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .page { position: relative; background: #fff; box-shadow: 0 1px 4px #0008; }
+  .page canvas { display: block; }
+  .text { position: absolute; inset: 0; overflow: hidden; line-height: 1; }
+  .text span { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; }
+  .text ::selection { background: #1a73e866; }
+  .hit { position: absolute; background: #ffe03a; opacity: .7; mix-blend-mode: multiply;
+    border-radius: 2px; pointer-events: none; }
+</style>
+<div id="bar">
+  <button id="out" title="Zoom out">−</button>
+  <button id="in" title="Zoom in">+</button>
+  <button id="fit" title="Fit width">↔</button>
+  <input id="num" value="1" aria-label="Page">
+  <span id="count">/ ?</span>
+  <span id="note"></span>
+</div>
+<div id="pages"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+
+  const params = new URLSearchParams(location.search)
+  const FILE = params.get('f') || ''
+  const $ = id => document.getElementById(id)
+  const norm = s => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+
+  const MAX_PIXELS = 16e6
+  window.VIEWER = 3
+  let doc, zoom = 1, base = null
+  const slots = []
+  const cache = new Map()
+
+  const observer = new IntersectionObserver(
+    entries => entries.forEach(en => en.isIntersecting && render(+en.target.dataset.n)),
+    { rootMargin: '1200px 0px' },
+  )
+
+  function fitZoom() {
+    return Math.max(0.3, (document.documentElement.clientWidth - 24) / base.width)
+  }
+
+  function layout() {
+    $('pages').replaceChildren()
+    slots.length = 0
+    for (let n = 1; n <= doc.numPages; n++) {
+      const el = document.createElement('div')
+      el.className = 'page'
+      el.dataset.n = n
+      el.style.width = base.width * zoom + 'px'
+      el.style.height = base.height * zoom + 'px'
+      $('pages').append(el)
+      slots.push(el)
+      observer.observe(el)
+    }
+  }
+
+  async function render(n) {
+    const el = slots[n - 1]
+    if (!el || el.dataset.done === String(zoom)) return
+    el.dataset.done = String(zoom)
+    const page = await doc.getPage(n)
+    const viewport = page.getViewport({ scale: zoom })
+    // Supersample: the pane is narrow, so a 1:1 canvas looks pixelated once the page is fitted.
+    let out = Math.max(window.devicePixelRatio || 1, 2.5)
+    out = Math.min(out, Math.sqrt(MAX_PIXELS / (viewport.width * viewport.height)))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.floor(viewport.width * out)
+    canvas.height = Math.floor(viewport.height * out)
+    canvas.style.width = viewport.width + 'px'
+    canvas.style.height = viewport.height + 'px'
+    el.style.width = viewport.width + 'px'
+    el.style.height = viewport.height + 'px'
+    const text = document.createElement('div')
+    text.className = 'text'
+    el.replaceChildren(canvas, text)
+    await page.render({
+      canvasContext: canvas.getContext('2d'),
+      viewport,
+      transform: [out, 0, 0, out, 0, 0],
+    }).promise
+    const content = await page.getTextContent()
+    text.style.setProperty('--scale-factor', viewport.scale)
+    pdfjsLib.renderTextLayer({ textContentSource: content, container: text, viewport, textDivs: [] })
+    if (el.dataset.quote) mark(n, el.dataset.quote)
+  }
+
+  async function content(n) {
+    if (!cache.has(n)) cache.set(n, doc.getPage(n).then(p => p.getTextContent()))
+    return cache.get(n)
+  }
+
+  // Finds the quote on page n and returns the rectangles (page CSS px) covering it.
+  async function locate(n, quote) {
+    const page = await doc.getPage(n)
+    const viewport = page.getViewport({ scale: zoom })
+    const items = (await content(n)).items.filter(i => i.str)
+    let stream = ''
+    const owner = []
+    items.forEach((it, i) => {
+      for (let c = 0; c < it.str.length; c++) {
+        for (const ch of norm(it.str[c])) {
+          stream += ch
+          owner.push([i, c])
+        }
+      }
+    })
+    const needle = norm(quote)
+    const at = needle.length < 4 ? -1 : stream.indexOf(needle)
+    if (at < 0) return null
+    const first = owner[at]
+    const last = owner[at + needle.length - 1]
+    const rects = []
+    for (let i = first[0]; i <= last[0]; i++) {
+      const it = items[i]
+      const from = i === first[0] ? first[1] : 0
+      const to = i === last[0] ? last[1] + 1 : it.str.length
+      const tx = pdfjsLib.Util.transform(viewport.transform, it.transform)
+      const w = it.width * viewport.scale
+      const h = Math.hypot(tx[2], tx[3])
+      rects.push({
+        left: tx[4] + (w * from) / it.str.length,
+        top: tx[5] - h,
+        width: (w * (to - from)) / it.str.length,
+        height: h * 1.15,
+      })
+    }
+    return rects
+  }
+
+  async function mark(n, quote) {
+    const el = slots[n - 1]
+    el.querySelectorAll('.hit').forEach(h => h.remove())
+    const rects = await locate(n, quote)
+    if (!rects) return false
+    for (const r of rects) {
+      const d = document.createElement('div')
+      d.className = 'hit'
+      Object.assign(d.style, {
+        left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px',
+      })
+      el.append(d)
+    }
+    return rects[0].top
+  }
+
+  async function jump(page, quote) {
+    $('note').textContent = ''
+    slots.forEach(s => { delete s.dataset.quote; s.querySelectorAll('.hit').forEach(h => h.remove()) })
+    let n = Math.min(Math.max(1, page), doc.numPages)
+    let found = null
+    if (quote) {
+      for (const k of [n, n - 1, n + 1]) {
+        if (k < 1 || k > doc.numPages) continue
+        if (await locate(k, quote)) { found = k; break }
+      }
+      if (found) {
+        if (found !== n) $('note').textContent = `the quote is on page ${found}, not ${n}`
+        n = found
+        slots[n - 1].dataset.quote = quote
+      } else {
+        $('note').textContent = 'passage not found'
+      }
+    }
+    await render(n)
+    const top = found ? await mark(n, quote) : 0
+    const y = slots[n - 1].offsetTop + (top || 0) - window.innerHeight / 3
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' })
+  }
+
+  function readHash() {
+    const h = new URLSearchParams(location.hash.slice(1))
+    if (h.get('page')) jump(+h.get('page'), h.get('q') || '')
+  }
+
+  async function setZoom(z) {
+    const n = +$('num').value || 1
+    zoom = z
+    layout()
+    await render(n)
+    slots[n - 1].scrollIntoView()
+  }
+
+  window.goTo = (page, quote, path) => {
+    if (path && path !== FILE) return 'other'
+    jump(page, quote)
+    return 'PDFVIEWER_OK'
+  }
+
+  window.addEventListener('scroll', () => {
+    const mid = window.scrollY + window.innerHeight / 2
+    const n = slots.findIndex(s => s.offsetTop + s.offsetHeight > mid) + 1
+    if (n && document.activeElement !== $('num')) $('num').value = n
+  }, { passive: true })
+  $('out').onclick = () => setZoom(zoom / 1.2)
+  $('in').onclick = () => setZoom(zoom * 1.2)
+  $('fit').onclick = () => setZoom(fitZoom())
+  $('num').onchange = () => jump(+$('num').value, '')
+  window.addEventListener('hashchange', readHash)
+
+  pdfjsLib.getDocument({ url: '/doc.pdf?f=' + encodeURIComponent(FILE) }).promise.then(async d => {
+    doc = d
+    document.title = FILE.split(/[\\/]/).pop()
+    $('count').textContent = '/ ' + d.numPages
+    base = (await d.getPage(1)).getViewport({ scale: 1 })
+    zoom = fitZoom()
+    layout()
+    readHash()
+  }).catch(e => { $('note').textContent = 'Could not open the PDF: ' + e.message })
+</script>

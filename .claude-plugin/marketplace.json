@@ -1,0 +1,5 @@
+{
+  "name": "pdf-citations",
+  "owner": { "name": "BorjaManterola" },
+  "plugins": [{ "name": "pdf-citations", "source": "./" }]
+}
