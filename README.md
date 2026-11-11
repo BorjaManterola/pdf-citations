@@ -11,6 +11,8 @@ source in one click, in the spirit of the source chips in NotebookLM.
 - Highlights blend with the text, so the words underneath stay readable.
 - No setup per document: attach a PDF to your message, or type its path, and Claude is told how
   to cite it.
+- Summaries come with each section title alone on its own line as a heading, larger than the body
+  text, so a change of section is easy to spot.
 
 ## Install
 
