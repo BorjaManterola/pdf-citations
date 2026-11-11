@@ -182,7 +182,7 @@ test('a PDF path typed in the prompt is announced to the model', async ($, on) =
   const sent = await $.prompt.submit({ text: 'Summarize D:\\papers\\a.pdf please' })
 
   expect(JSON.stringify(sent)).toContain('[[D:\\\\papers\\\\a.pdf|p.N|literal quote]]')
-  expect(JSON.stringify(sent)).toContain('as a Markdown heading (## Title)')
+  expect(JSON.stringify(sent)).toContain('a level-2 heading (## Section)')
 })
 
 test('a quoted PDF path with spaces is announced to the model', async ($, on) => {

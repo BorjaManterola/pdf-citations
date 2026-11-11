@@ -30,10 +30,12 @@ const INSTRUCTIONS = (path: string) =>
   `citation at the end of the sentence or paragraph it supports: the interface turns it into ` +
   `a small numbered square (numbering restarts in every paragraph), and clicking it moves the ` +
   `viewer to that passage and highlights it. In your text, call them "the numbered square" ` +
-  `so the reader knows they can be clicked. When you deliver a summary or any answer with ` +
-  `sections, write each section title alone on a single line as a Markdown heading (## Title), ` +
-  `with a blank line before and after, so a change of section stands out; never use a bold ` +
-  `phrase at the start of a paragraph as a title.`
+  `so the reader knows they can be clicked. Lay out a summary like a README: open with the ` +
+  `document title as a level-1 heading (# Title), give every section a level-2 heading ` +
+  `(## Section) and every subsection a level-3 heading (### Subsection), each alone on its own ` +
+  `short line with a blank line before and after, and put a horizontal rule (---, with a blank ` +
+  `line above and below it) before every level-2 heading but the first, so each change of ` +
+  `section stands out. Never use a bold phrase at the start of a paragraph as a title.`
 
 // Both die with the module: the child is killed on reload, so the flag resets with it.
 let serving = false
