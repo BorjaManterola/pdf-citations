@@ -5,30 +5,22 @@ Clickable PDF citations for the **Claude desktop app**.
 When Claude answers from a PDF, each claim ends with a citation number in square brackets, `[n]`,
 and a small numbered button sits under the paragraph. Click it and a built-in PDF viewer opens (or
 scrolls) to the exact passage and highlights it, so you can check the source in one click, in the
-spirit of the source chips in NotebookLM.
+spirit of the source chips in Gemini Notebook.
 
 - Buttons sit right under the paragraph that cites, not in a list at the end, and the numbers run
   in order through the whole answer.
 - The viewer is a real reader: continuous scrolling, zoom, text selection, page box.
-- Highlights blend with the text, so the words underneath stay readable.
+- Highlights blend with the text.
 - No setup per document: attach a PDF to your message, or type its path, and Claude is told how
   to cite it.
-- By default, summaries are laid out like a README: a large title, `##` sections separated by horizontal
-  rules, and `###` subsections, so a change of section is easy to spot. Sections are written as
-  explanatory prose, and formulas come in LaTeX.
 
 ## Install
 
-At the prompt of a terminal session:
+At the prompt of an app session:
 
 ```
-/plugin install pdf-citations --marketplace BorjaManterola/pdf-citations
-```
-
-From a shell:
-
-```
-claude plugin install pdf-citations --marketplace BorjaManterola/pdf-citations
+claude plugin marketplace add BorjaManterola/pdf-citations
+claude plugin install pdf-citations@pdf-citations
 ```
 
 In the desktop app, where `/plugin` does not run: click **+** next to the prompt box, then
