@@ -1,11 +1,20 @@
 {
   "name": "pdf-citations",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Clickable PDF citations for the Claude desktop app: citations in answers become small numbered squares that scroll a built-in PDF viewer to the exact passage and highlight it.",
-  "author": { "name": "BorjaManterola", "url": "https://github.com/BorjaManterola" },
+  "author": {
+    "name": "BorjaManterola",
+    "url": "https://github.com/BorjaManterola"
+  },
   "license": "MIT",
   "homepage": "https://github.com/BorjaManterola/pdf-citations",
   "repository": "https://github.com/BorjaManterola/pdf-citations",
-  "keywords": ["pdf", "citations", "sources", "viewer", "desktop"],
+  "keywords": [
+    "pdf",
+    "citations",
+    "sources",
+    "viewer",
+    "desktop"
+  ],
   "types": "./types/index.d.ts"
 }

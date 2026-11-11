@@ -5,6 +5,8 @@ type Cite = { id: string; num: number; path?: string; page: number; quote: strin
 
 const PORT = 8765
 const BROWSER = 'Claude_Browser'
+// A numbered square draws one digit, so a unit of citations is closed before it can reach two.
+const MAX_PER_UNIT = 6
 const ASK = { plugin: 'pdf-citations', key: 'ask' } as const
 const CITE = /\s*\[\[(?:([^|\]]+)\|)?p\.(\d+)\|([^\]]+)\]\]/g
 const LIST = /^\s*([-*+]|\d+\.)\s|^#{1,6}\s/
@@ -223,9 +225,14 @@ export const register: Register = on => {
       n = 0
     }
 
+    let tableHead: string[] = []
+
     // shortcut: a code fence or $$ block holding another ``` or $$ would toggle this wrongly.
     lines.forEach((raw, i) => {
       if ((raw.match(/```|\$\$/g) ?? []).length % 2) fence = !fence
+      const inTable = /^\s*\|/.test(raw)
+      if (inTable && !/^\s*\|/.test(lines[i - 1] ?? '')) tableHead = []
+      if (inTable && tableHead.length < 2) tableHead.push(raw.replace(CITE, ''))
       const found = [...raw.matchAll(CITE)]
       const base = n
       buf.push(raw.replace(CITE, () => ` ${keycap(++n)}`))
@@ -239,11 +246,16 @@ export const register: Register = on => {
         }),
       )
       const after = lines[i + 1]
-      const inTable = /^\s*\|/.test(raw)
       const tableNext = /^\s*\|/.test(after ?? '')
       const closes =
         after === undefined || !after.trim() || LIST.test(after) || (inTable && !tableNext)
-      if (pending.length > 0 && !fence && closes) flush()
+      if (pending.length === 0 || fence) return
+      if (closes) {
+        flush()
+      } else if (pending.length >= MAX_PER_UNIT) {
+        flush()
+        if (inTable) buf = [...tableHead]
+      }
     })
     if (buf.some(l => l.trim())) flush()
 

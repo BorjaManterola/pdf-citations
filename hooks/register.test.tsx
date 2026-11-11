@@ -192,3 +192,22 @@ test('a quoted PDF path with spaces is announced to the model', async ($, on) =>
 
   expect(JSON.stringify(sent)).toContain('[[D:\\\\my papers\\\\BKT 2016.pdf|p.N|literal quote]]')
 })
+
+test('long runs of citations are split so every square holds a single digit', async ($, on) => {
+  on('state.get', () => ({ value: { value: undefined, version: 0 } }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  const rows = Array.from({ length: 14 }, (_, i) => `| r${i} | x [[a.pdf|p.${i + 1}|quoted words ${i}]] |`)
+  const text = ['| A | B |', '|---|---|', ...rows].join('\n')
+
+  const ui = await $.ui.mount({ ...MESSAGE, props: { text, isFirstOfReply: true } })
+
+  for (let i = 0; i < 14; i++) {
+    const label = String((await ui.find({ key: `m1-${i}` }))?.props.label)
+    expect(label).toMatch(/^[1-9]︎⃣$/)
+  }
+  await ui.unmount()
+})

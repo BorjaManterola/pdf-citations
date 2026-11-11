@@ -52,8 +52,8 @@ there.
   and the PDF file you ask for. Only `.pdf` files are served, and only to your own machine.
 - **Internet on first use**, because the viewer loads pdf.js from cdnjs.
 - Highlights need a PDF with a text layer; scanned PDFs open but cannot be highlighted.
-- A numbered square draws one digit, so numbering restarts in every paragraph; a tenth citation in
-  one paragraph shows as `[10]` without the square.
+- A numbered square draws one digit, so numbering restarts in every paragraph, and a run of more
+  than six citations is closed early (a long table is cut into chunks that repeat its header).
 
 ## How it works
 
