@@ -56,6 +56,31 @@ test('citations read [n] in order through the answer, with a button under each p
   await ui.unmount()
 })
 
+test('a line holding only markers adds buttons but no loose [n] above them', async ($, on) => {
+  on('state.get', () => ({ value: { value: undefined, version: 0 } }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+
+  const ui = await $.ui.mount({
+    ...MESSAGE,
+    props: {
+      text: 'A paragraph of prose.\n\n[[a.pdf|p.2|some quoted words]] [[a.pdf|p.3|more quoted words]]',
+      isFirstOfReply: true,
+    },
+  })
+
+  expect((await ui.find({ type: 'Markdown', text: /A paragraph of prose\./ }))?.text).not.toMatch(
+    /\[1\]/,
+  )
+  expect(await ui.find({ type: 'Markdown', text: /\[1\]/ })).toBeUndefined()
+  expect((await ui.find({ key: 'm1-0' }))?.props.label).toBe('¹')
+  expect((await ui.find({ key: 'm1-1' }))?.props.label).toBe('²')
+  await ui.unmount()
+})
+
 test('a table stays whole, its buttons come after the last row, and big numbers are one button', async ($, on) => {
   on('state.get', () => ({ value: { value: undefined, version: 0 } }))
   on('ui.render', ($, e) => {

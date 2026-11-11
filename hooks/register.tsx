@@ -27,9 +27,10 @@ const INSTRUCTIONS = (path: string) =>
   `The PDF viewer has "${path}" as its active document. From now on, after every claim taken ` +
   `from that PDF, write a citation in exactly this format: [[${path}|p.N|literal quote]] — ` +
   `N is the PDF page (1 = the first) and the quote is 4 to 12 consecutive words copied ` +
-  `verbatim from the PDF, with no formulas, vertical bars or square brackets. Put each ` +
-  `citation at the end of the sentence or paragraph it supports, never inside a formula: the ` +
-  `interface shows it as a number in square brackets, [n], in your text and as a numbered ` +
+  `verbatim from the PDF, with no formulas, vertical bars or square brackets. Write each ` +
+  `marker inline, right after the sentence it supports, inside that paragraph: never on a ` +
+  `line of its own and never inside a formula. Do not type citation numbers yourself: the ` +
+  `interface replaces each marker with a number in square brackets, [n], and adds a numbered ` +
   `button under the paragraph that moves the viewer to that passage and highlights it; the ` +
   `numbers run in order through the whole answer. Lay out a summary like a README: open with ` +
   `the document title as a level-1 heading (# Title), give every section a level-2 heading ` +
@@ -208,7 +209,8 @@ export const register: Register = on => {
     }
 
     const flush = () => {
-      nodes.push(<Markdown text={buf.join('\n')} />)
+      const text = buf.join('\n')
+      if (text.trim()) nodes.push(<Markdown text={text} />)
       if (pending.length > 0) {
         nodes.push(
           <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
@@ -239,7 +241,9 @@ export const register: Register = on => {
       if ((raw.match(/```|\$\$/g) ?? []).length % 2) fence = !fence
       const found = [...raw.matchAll(CITE)]
       const base = n
-      buf.push(raw.replace(CITE, () => ` [${++n}]`))
+      const line = raw.replace(CITE, () => ` [${++n}]`)
+      // A line of bare markers would print "[n]" right above its own buttons.
+      if (!found.length || raw.replace(CITE, '').trim()) buf.push(line)
       found.forEach((m, k) =>
         pending.push({
           id: `${e.requestId}-${base + k}`,
