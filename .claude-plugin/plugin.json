@@ -1,7 +1,7 @@
 {
   "name": "pdf-citations",
-  "version": "0.1.2",
-  "description": "Clickable PDF citations for the Claude desktop app: citations in answers become small numbered squares that scroll a built-in PDF viewer to the exact passage and highlight it.",
+  "version": "0.1.7",
+  "description": "Clickable PDF citations for the Claude desktop app: citations in answers become numbered buttons that scroll a built-in PDF viewer to the exact passage and highlight it.",
   "author": {
     "name": "BorjaManterola",
     "url": "https://github.com/BorjaManterola"

@@ -8,7 +8,6 @@ const MESSAGE = {
 } as const
 
 const OK = { value: { exitCode: 0, stdout: '', stderr: '' } }
-const ONE = '1\uFE0E\u20E3'
 
 test('a message with no citation is left to the engine', async ($, on) => {
   on('ui.render', ($, e) => {
@@ -26,7 +25,7 @@ test('a message with no citation is left to the engine', async ($, on) => {
   await ui.unmount()
 })
 
-test('numbered squares sit under the paragraph that cites, not at the end', async ($, on) => {
+test('citations read [n] in order through the answer, with a button under each paragraph', async ($, on) => {
   on('state.get', () => ({ value: { value: undefined, version: 0 } }))
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -37,46 +36,46 @@ test('numbered squares sit under the paragraph that cites, not at the end', asyn
   const ui = await $.ui.mount({
     ...MESSAGE,
     props: {
-      text:
-        'First [[a.pdf|p.5|decays geometrically at rate]].\n\nSecond [[a.pdf|p.6|converges to a ceiling]].',
+      text: [
+        'First [[a.pdf|p.5|decays geometrically at rate]].',
+        'Second [[a.pdf|p.6|converges to a ceiling]] and [[a.pdf|p.7|four time steps]].',
+        'Third [[a.pdf|p.8|the learning input]].',
+      ].join('\n\n'),
       isFirstOfReply: true,
     },
   })
 
-  expect((await ui.find({ type: 'Markdown', text: new RegExp(`First ${ONE}`) }))?.text).not.toMatch(
-    /Second/,
-  )
-  expect((await ui.find({ type: 'Markdown', text: new RegExp(`Second ${ONE}`) }))?.text).not.toMatch(
+  expect((await ui.find({ type: 'Markdown', text: /First \[1\]\./ }))?.text).not.toMatch(/Second/)
+  expect((await ui.find({ type: 'Markdown', text: /Second \[2\] and \[3\]\./ }))?.text).not.toMatch(
     /First/,
   )
-  expect((await ui.find({ key: 'm1-0' }))?.props.label).toBe(ONE)
-  expect((await ui.find({ key: 'm1-1' }))?.props.label).toBe(ONE)
+  expect((await ui.find({ type: 'Markdown', text: /Third \[4\]\./ }))?.text).not.toMatch(/Second/)
+  const labels = []
+  for (let i = 0; i < 4; i++) labels.push((await ui.find({ key: `m1-${i}` }))?.props.label)
+  expect(labels).toEqual(['¹', '²', '³', '⁴'])
   await ui.unmount()
 })
 
-test('a table stays whole and its squares come after the last row', async ($, on) => {
+test('a table stays whole, its buttons come after the last row, and big numbers are one button', async ($, on) => {
   on('state.get', () => ({ value: { value: undefined, version: 0 } }))
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
 
     return <Text>engine</Text>
   })
+  const rows = Array.from({ length: 14 }, (_, i) => `| r${i} | x [[a.pdf|p.${i + 1}|quoted words ${i}]] |`)
+  const text = ['| A | B |', '|---|---|', ...rows, '', 'End.'].join('\n')
 
-  const ui = await $.ui.mount({
-    ...MESSAGE,
-    props: {
-      text: '| A | B |\n|---|---|\n| 1 | x [[a.pdf|p.2|some quoted words here]] |\n| 2 | y |\n\nEnd.',
-      isFirstOfReply: true,
-    },
-  })
+  const ui = await $.ui.mount({ ...MESSAGE, props: { text, isFirstOfReply: true } })
 
-  const table = await ui.find({ type: 'Markdown', text: /\| 2 \| y \|/ })
+  const table = await ui.find({ type: 'Markdown', text: /\| r13 \| x \[14\] \|/ })
   expect(table?.text).toMatch(/\| A \| B \|/)
-  expect((await ui.find({ key: 'm1-0' }))?.props.label).toBe(ONE)
+  expect(table?.text).toMatch(/\| r0 \| x \[1\] \|/)
+  expect((await ui.find({ key: 'm1-13' }))?.props.label).toBe('¹⁴')
   await ui.unmount()
 })
 
-test('pressing a square loads the viewer at that page with the quote', async ($, on) => {
+test('pressing a button loads the viewer at that page with the quote', async ($, on) => {
   const calls: { tool: string; args: Record<string, unknown> }[] = []
   on('state.get', () => ({ value: { value: undefined, version: 0 } }))
   on('process.run', () => OK)
@@ -130,7 +129,7 @@ test('a viewer that already holds the PDF is moved without reloading', async ($,
   await ui.unmount()
 })
 
-test('a square with no known PDF asks for the path right there, then opens it', async ($, on) => {
+test('a button with no known PDF asks for the path right there, then opens it', async ($, on) => {
   const state = new Map<string, unknown>()
   const calls: string[] = []
   on('state.get', (_, e) => ({ value: { value: state.get(e.key), version: 1 } }))
@@ -175,14 +174,16 @@ test('a square with no known PDF asks for the path right there, then opens it', 
   await again.unmount()
 })
 
-test('a PDF path typed in the prompt is announced to the model', async ($, on) => {
+test('a PDF path typed in the prompt is announced with layout, prose and LaTeX rules', async ($, on) => {
   on('fs.stat', () => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false } }))
   on('prompt.submit', (_, e) => ({ text: e.text, context: e.context }))
 
-  const sent = await $.prompt.submit({ text: 'Summarize D:\\papers\\a.pdf please' })
+  const sent = JSON.stringify(await $.prompt.submit({ text: 'Summarize D:\\papers\\a.pdf please' }))
 
-  expect(JSON.stringify(sent)).toContain('[[D:\\\\papers\\\\a.pdf|p.N|literal quote]]')
-  expect(JSON.stringify(sent)).toContain('a level-2 heading (## Section)')
+  expect(sent).toContain('[[D:\\\\papers\\\\a.pdf|p.N|literal quote]]')
+  expect(sent).toContain('a level-2 heading (## Section)')
+  expect(sent).toContain('explanatory prose paragraphs')
+  expect(sent).toContain('$$ … $$')
 })
 
 test('a quoted PDF path with spaces is announced to the model', async ($, on) => {
@@ -194,21 +195,20 @@ test('a quoted PDF path with spaces is announced to the model', async ($, on) =>
   expect(JSON.stringify(sent)).toContain('[[D:\\\\my papers\\\\BKT 2016.pdf|p.N|literal quote]]')
 })
 
-test('long runs of citations are split so every square holds a single digit', async ($, on) => {
-  on('state.get', () => ({ value: { value: undefined, version: 0 } }))
-  on('ui.render', ($, e) => {
-    const { Text } = $.ui.resolve(e)
+test('a PDF path relative to the session folder is resolved and announced', async ($, on) => {
+  const stats: string[] = []
+  on('session.cwd', () => ({ value: 'D:\\proj' }))
+  on('fs.stat', (_, e) => {
+    stats.push(e.path)
 
-    return <Text>engine</Text>
+    return { value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false } }
   })
-  const rows = Array.from({ length: 14 }, (_, i) => `| r${i} | x [[a.pdf|p.${i + 1}|quoted words ${i}]] |`)
-  const text = ['| A | B |', '|---|---|', ...rows].join('\n')
+  on('prompt.submit', (_, e) => ({ text: e.text, context: e.context }))
 
-  const ui = await $.ui.mount({ ...MESSAGE, props: { text, isFirstOfReply: true } })
+  const sent = await $.prompt.submit({
+    text: 'Hazme un resumen de este paper:\n\n aulapulse-core\\docs\\papers\\gao-2025.pdf',
+  })
 
-  for (let i = 0; i < 14; i++) {
-    const label = String((await ui.find({ key: `m1-${i}` }))?.props.label)
-    expect(label).toMatch(/^[1-9]︎⃣$/)
-  }
-  await ui.unmount()
+  expect(stats).toEqual(['D:\\proj\\aulapulse-core\\docs\\papers\\gao-2025.pdf'])
+  expect(JSON.stringify(sent)).toContain('[[D:\\\\proj\\\\aulapulse-core\\\\docs\\\\papers\\\\gao-2025.pdf|p.N|')
 })

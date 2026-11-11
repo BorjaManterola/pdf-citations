@@ -5,12 +5,13 @@ type Cite = { id: string; num: number; path?: string; page: number; quote: strin
 
 const PORT = 8765
 const BROWSER = 'Claude_Browser'
-// A numbered square draws one digit, so a unit of citations is closed before it can reach two.
-const MAX_PER_UNIT = 6
 const ASK = { plugin: 'pdf-citations', key: 'ask' } as const
 const CITE = /\s*\[\[(?:([^|\]]+)\|)?p\.(\d+)\|([^\]]+)\]\]/g
 const LIST = /^\s*([-*+]|\d+\.)\s|^#{1,6}\s/
-const PDF_PATH = /"([A-Za-z]:\\[^"<>|*?]+?\.pdf)"|([A-Za-z]:\\[^\s"'<>|*?]+?\.pdf)/gi
+// Quoted or bare, absolute or relative to the session folder (resolved when the prompt is sent).
+const PDF_PATH = /"([^"<>|*?\r\n]+?\.pdf)"|([^\s"'<>|*?]+?\.pdf)\b/gi
+const ABSOLUTE = /^[A-Za-z]:[\\/]|^\\\\/
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹'
 const WAIT_FOR_PORT =
   'import socket, time\n' +
   'for _ in range(60):\n' +
@@ -27,23 +28,25 @@ const INSTRUCTIONS = (path: string) =>
   `from that PDF, write a citation in exactly this format: [[${path}|p.N|literal quote]] — ` +
   `N is the PDF page (1 = the first) and the quote is 4 to 12 consecutive words copied ` +
   `verbatim from the PDF, with no formulas, vertical bars or square brackets. Put each ` +
-  `citation at the end of the sentence or paragraph it supports: the interface turns it into ` +
-  `a small numbered square (numbering restarts in every paragraph), and clicking it moves the ` +
-  `viewer to that passage and highlights it. In your text, call them "the numbered square" ` +
-  `so the reader knows they can be clicked. Lay out a summary like a README: open with the ` +
-  `document title as a level-1 heading (# Title), give every section a level-2 heading ` +
+  `citation at the end of the sentence or paragraph it supports, never inside a formula: the ` +
+  `interface shows it as a number in square brackets, [n], in your text and as a numbered ` +
+  `button under the paragraph that moves the viewer to that passage and highlights it; the ` +
+  `numbers run in order through the whole answer. Lay out a summary like a README: open with ` +
+  `the document title as a level-1 heading (# Title), give every section a level-2 heading ` +
   `(## Section) and every subsection a level-3 heading (### Subsection), each alone on its own ` +
   `short line with a blank line before and after, and put a horizontal rule (---, with a blank ` +
   `line above and below it) before every level-2 heading but the first, so each change of ` +
-  `section stands out. Never use a bold phrase at the start of a paragraph as a title.`
+  `section stands out. Never use a bold phrase at the start of a paragraph as a title. Write ` +
+  `each section as explanatory prose paragraphs that connect the ideas; use bullets only for ` +
+  `short lists of parallel items, never as the whole summary. Write every formula in LaTeX: ` +
+  `each displayed equation alone in a $$ … $$ block with blank lines around it, and symbols ` +
+  `inside a sentence as $…$; never write a formula as plain text.`
 
 // Both die with the module: the child is killed on reload, so the flag resets with it.
 let serving = false
 let lastPath = ''
 
-// A digit plus the combining enclosing keycap draws a thin square hugging the digit; it only
-// encloses one digit, so numbering restarts per paragraph and a tenth citation falls back to [10].
-const keycap = (k: number) => (k <= 9 ? `${k}︎⃣` : `[${k}]`)
+const sup = (n: number) => String(n).replace(/\d/g, d => SUPERSCRIPT[+d]!)
 
 async function serve($: Api): Promise<boolean> {
   if (!serving) {
@@ -153,7 +156,10 @@ export const register: Register = on => {
         path = (await savePdf($, a.id, a.filename ?? 'document.pdf')) ?? path
       }
       for (const m of e.text.matchAll(PDF_PATH)) {
-        const file = m[1] ?? m[2]!
+        const written = (m[1] ?? m[2]!).replace(/^@/, '')
+        const file = ABSOLUTE.test(written)
+          ? written
+          : `${await $.session.cwd()}\\${written.replace(/^\.[\\/]/, '')}`.replace(/\//g, '\\')
         if (await $.fs.stat(file).then(() => true, () => false)) path = file
       }
     } catch {
@@ -175,7 +181,6 @@ export const register: Register = on => {
     let pending: Cite[] = []
     let fence = false
     let n = 0
-    let total = 0
 
     const press = (c: Cite) => async () => {
       const path = c.path ?? lastPath
@@ -208,7 +213,7 @@ export const register: Register = on => {
         nodes.push(
           <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
             {pending.map(c => (
-              <Button key={c.id} plain label={keycap(c.num)} onPress={press(c)} />
+              <Button key={c.id} label={sup(c.num)} onPress={press(c)} />
             ))}
           </Box>,
         )
@@ -227,23 +232,17 @@ export const register: Register = on => {
       }
       buf = []
       pending = []
-      n = 0
     }
-
-    let tableHead: string[] = []
 
     // shortcut: a code fence or $$ block holding another ``` or $$ would toggle this wrongly.
     lines.forEach((raw, i) => {
       if ((raw.match(/```|\$\$/g) ?? []).length % 2) fence = !fence
-      const inTable = /^\s*\|/.test(raw)
-      if (inTable && !/^\s*\|/.test(lines[i - 1] ?? '')) tableHead = []
-      if (inTable && tableHead.length < 2) tableHead.push(raw.replace(CITE, ''))
       const found = [...raw.matchAll(CITE)]
       const base = n
-      buf.push(raw.replace(CITE, () => ` ${keycap(++n)}`))
+      buf.push(raw.replace(CITE, () => ` [${++n}]`))
       found.forEach((m, k) =>
         pending.push({
-          id: `${e.requestId}-${total++}`,
+          id: `${e.requestId}-${base + k}`,
           num: base + k + 1,
           path: m[1],
           page: +m[2]!,
@@ -251,16 +250,11 @@ export const register: Register = on => {
         }),
       )
       const after = lines[i + 1]
+      const inTable = /^\s*\|/.test(raw)
       const tableNext = /^\s*\|/.test(after ?? '')
       const closes =
         after === undefined || !after.trim() || LIST.test(after) || (inTable && !tableNext)
-      if (pending.length === 0 || fence) return
-      if (closes) {
-        flush()
-      } else if (pending.length >= MAX_PER_UNIT) {
-        flush()
-        if (inTable) buf = [...tableHead]
-      }
+      if (pending.length > 0 && !fence && closes) flush()
     })
     if (buf.some(l => l.trim())) flush()
 

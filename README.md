@@ -2,17 +2,20 @@
 
 Clickable PDF citations for the **Claude desktop app**.
 
-When Claude answers from a PDF, each claim ends with a small numbered square. Click it and a
-built-in PDF viewer opens (or scrolls) to the exact passage and highlights it, so you can check the
-source in one click, in the spirit of the source chips in NotebookLM.
+When Claude answers from a PDF, each claim ends with a citation number in square brackets, `[n]`,
+and a small numbered button sits under the paragraph. Click it and a built-in PDF viewer opens (or
+scrolls) to the exact passage and highlights it, so you can check the source in one click, in the
+spirit of the source chips in NotebookLM.
 
-- Squares sit right under the paragraph that cites, not in a list at the end.
+- Buttons sit right under the paragraph that cites, not in a list at the end, and the numbers run
+  in order through the whole answer.
 - The viewer is a real reader: continuous scrolling, zoom, text selection, page box.
 - Highlights blend with the text, so the words underneath stay readable.
 - No setup per document: attach a PDF to your message, or type its path, and Claude is told how
   to cite it.
 - Summaries are laid out like a README: a large title, `##` sections separated by horizontal
-  rules, and `###` subsections, so a change of section is easy to spot.
+  rules, and `###` subsections, so a change of section is easy to spot. Sections are written as
+  explanatory prose, and formulas come in LaTeX.
 
 ## Install
 
@@ -48,13 +51,13 @@ Any of these tells Claude which PDF is active and how to cite it:
 
 1. **Attach a PDF** to your message. The plugin saves a copy to a temporary folder and resolves the
    location for you.
-2. **Type or paste the path** in your message, for example `D:\papers\paper.pdf` or
-   `@"D:\my papers\paper.pdf"`.
+2. **Type or paste the path** in your message, absolute or relative to the session folder, for
+   example `D:\papers\paper.pdf`, `docs\paper.pdf` or `@"D:\my papers\paper.pdf"`.
 3. **Run `/pdf-viewer <path to PDF>`** to open a PDF in the viewer yourself.
 
-Then ask about the document. Citations in the answer appear as numbered squares; click one to jump
-to the passage. If a square does not know which PDF it belongs to, it asks for the path right
-there.
+Then ask about the document. Citations in the answer appear as `[n]` with a numbered button under
+the paragraph; click one to jump to the passage. If a button does not know which PDF it belongs
+to, it asks for the path right there.
 
 ## Requirements and limits
 
@@ -65,13 +68,12 @@ there.
   and the PDF file you ask for. Only `.pdf` files are served, and only to your own machine.
 - **Internet on first use**, because the viewer loads pdf.js from cdnjs.
 - Highlights need a PDF with a text layer; scanned PDFs open but cannot be highlighted.
-- A numbered square draws one digit, so numbering restarts in every paragraph, and a run of more
-  than six citations is closed early (a long table is cut into chunks that repeat its header).
+- A table's buttons come after its last row.
 
 ## How it works
 
 Claude is asked to cite with `[[path|p.N|verbatim quote]]`. The plugin renders those markers as
-squares under each paragraph. A click starts the local server if needed, then asks the built-in
+`[n]` in the text and as buttons under each paragraph. A click starts the local server if needed, then asks the built-in
 browser to open `viewer.html` or, if it already shows that PDF, to scroll to page `N`, where the
 quote is located in the text layer and highlighted (the neighbouring pages are tried if the page
 number is off by one).
