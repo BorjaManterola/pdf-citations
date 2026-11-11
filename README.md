@@ -13,7 +13,7 @@ spirit of the source chips in NotebookLM.
 - Highlights blend with the text, so the words underneath stay readable.
 - No setup per document: attach a PDF to your message, or type its path, and Claude is told how
   to cite it.
-- Summaries are laid out like a README: a large title, `##` sections separated by horizontal
+- By default, summaries are laid out like a README: a large title, `##` sections separated by horizontal
   rules, and `###` subsections, so a change of section is easy to spot. Sections are written as
   explanatory prose, and formulas come in LaTeX.
 
@@ -58,6 +58,19 @@ Any of these tells Claude which PDF is active and how to cite it:
 Then ask about the document. Citations in the answer appear as `[n]` with a numbered button under
 the paragraph; click one to jump to the passage. If a button does not know which PDF it belongs
 to, it asks for the path right there.
+
+### Ask for the style you want
+
+The plugin is about citations: it makes every claim traceable to its passage in the PDF. It also
+gives Claude a default layout (README-style headings, prose, LaTeX), but how long, how detailed
+and how the answer is written still depend on the model and on your prompt, so the same request
+can come back shorter or more list-like in another session. Say what you want in the prompt, for
+example:
+
+```
+Write a complete, detailed summary in explanatory paragraphs, not bullet points,
+and explain the methodology and where the data comes from.
+```
 
 ## Requirements and limits
 
