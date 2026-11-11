@@ -31,6 +31,17 @@ claude plugin install pdf-citations --marketplace BorjaManterola/pdf-citations
 In the desktop app, where `/plugin` does not run: click **+** next to the prompt box, then
 **Plugins**, **Add marketplace** with `BorjaManterola/pdf-citations`, then **Add plugin**.
 
+## Update
+
+From a shell, refresh the marketplace, then update the plugin:
+
+```
+claude plugin marketplace update pdf-citations
+claude plugin update pdf-citations@pdf-citations
+```
+
+Restart Claude (or open a new session) to load the new version.
+
 ## Use
 
 Any of these tells Claude which PDF is active and how to cite it:
